@@ -2,12 +2,21 @@
 
 namespace App\Entity;
 
+
+
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+
+
+
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
+#[UniqueEntity(fields: ['email'], message: 'Cet email est déjà utilisé.')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
@@ -35,15 +44,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(nullable: true)]
-    private ?\DateTimeImmutable $updateAt = null;
+    private ?\DateTimeImmutable $updatedAt = null;
 
     #[ORM\Column(length: 255)]
-    private ?string $apiToken ;
-    
+    private ?string $apiToken = null;
+
     public function __construct()
-    {
-        $this->apiToken = bin2hex(random_bytes(20));
-    }
+{
+    $this->createdAt = new \DateTimeImmutable();
+    $this->apiToken = bin2hex(random_bytes(20));
+    $this->orders = new ArrayCollection();
+    $this->passwordResetTokens = new ArrayCollection();
+    $this->reviews = new ArrayCollection();
+}
+
 
 
     public function getId(): ?int
@@ -62,6 +76,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $firstName = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $lastName = null;
 
     /**
      * A visual identifier that represents this user.
@@ -117,7 +137,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $data = (array) $this;
         $data["\0" . self::class . "\0password"] = hash('crc32c', $this->password);
-        
+
         return $data;
     }
 
@@ -139,14 +159,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getUpdateAt(): ?\DateTimeImmutable
+    public function getUpdatedAt(): ?\DateTimeImmutable
     {
-        return $this->updateAt;
+        return $this->updatedAt;
     }
 
-    public function setUpdateAt(?\DateTimeImmutable $updateAt): static
+    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
     {
-        $this->updateAt = $updateAt;
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
@@ -162,4 +182,182 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
+    public function getFirstName(): ?string
+    {
+        return $this->firstName;
+    }
+
+    public function setFirstName(string $firstName): static
+    {
+        $this->firstName = $firstName;
+        return $this;
+    }
+
+    public function getLastName(): ?string
+    {
+        return $this->lastName;
+    }
+
+    public function setLastName(string $lastName): static
+    {
+        $this->lastName = $lastName;
+        return $this;
+    }
+
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $gsm = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $postalAddress = null;
+
+    /**
+     * @var Collection<int, Order>
+     */
+    #[ORM\OneToMany(targetEntity: Order::class, mappedBy: 'user')]
+    private Collection $orders;
+
+    /**
+     * @var Collection<int, PasswordResetToken>
+     */
+    #[ORM\OneToMany(targetEntity: PasswordResetToken::class, mappedBy: 'user', orphanRemoval: true)]
+    private Collection $passwordResetTokens;
+
+    public function getGsm(): ?string
+    {
+        return $this->gsm;
+    }
+    public function setGsm(?string $gsm): static
+    {
+        $this->gsm = $gsm;
+        return $this;
+    }
+
+    public function getPostalAddress(): ?string
+    {
+        return $this->postalAddress;
+    }
+    public function setPostalAddress(?string $postalAddress): static
+    {
+        $this->postalAddress = $postalAddress;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Order>
+     */
+    public function getOrders(): Collection
+    {
+        return $this->orders;
+    }
+
+    public function addOrder(Order $order): static
+    {
+        if (!$this->orders->contains($order)) {
+            $this->orders->add($order);
+            $order->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeOrder(Order $order): static
+{
+    $this->orders->removeElement($order);
+    return $this;
+}
+
+    /**
+     * @return Collection<int, PasswordResetToken>
+     */
+    public function getPasswordResetTokens(): Collection
+    {
+        return $this->passwordResetTokens;
+    }
+
+    public function addPasswordResetToken(PasswordResetToken $passwordResetToken): static
+    {
+        if (!$this->passwordResetTokens->contains($passwordResetToken)) {
+            $this->passwordResetTokens->add($passwordResetToken);
+            $passwordResetToken->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removePasswordResetToken(PasswordResetToken $passwordResetToken): static
+    {
+        if ($this->passwordResetTokens->removeElement($passwordResetToken)) {
+            // set the owning side to null (unless already changed)
+            if ($passwordResetToken->getUser() === $this) {
+                $passwordResetToken->setUser(null);
+            }
+        }
+
+        return $this;
+    }
+    #[ORM\Column(type: 'text', nullable: true)]
+private ?string $allergies = null;
+
+    /**
+     * @var Collection<int, Review>
+     */
+    #[ORM\OneToMany(targetEntity: Review::class, mappedBy: 'userRef', orphanRemoval: true)]
+    private Collection $reviews;
+
+public function getAllergies(): ?string
+{
+    return $this->allergies;
+}
+
+public function setAllergies(?string $allergies): static
+{
+    $this->allergies = $allergies;
+    return $this;
+}
+
+/**
+ * @return Collection<int, Review>
+ */
+public function getReviews(): Collection
+{
+    return $this->reviews;
+}
+
+public function addReview(Review $review): static
+{
+    if (!$this->reviews->contains($review)) {
+        $this->reviews->add($review);
+        $review->setUserRef($this);
+    }
+
+    return $this;
+}
+
+public function removeReview(Review $review): static
+{
+    if ($this->reviews->removeElement($review)) {
+        // set the owning side to null (unless already changed)
+        if ($review->getUserRef() === $this) {
+            $review->setUserRef(null);
+        }
+    }
+
+    return $this;
+}
+#[ORM\Column]
+private bool $isActive = true;
+
+public function isActive(): bool
+{
+    return $this->isActive;
+}
+
+public function setIsActive(bool $isActive): static
+{
+    $this->isActive = $isActive;
+    return $this;
+}
+
+
+
 }

@@ -1,35 +1,66 @@
 security:
-    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
-    password_hashers:
-        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+  role_hierarchy:
+    ROLE_ADMIN: [ROLE_EMPLOYE, ROLE_CLIENT]
+    ROLE_EMPLOYE: [ROLE_CLIENT]
 
-    # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
-    providers:
-        # used to reload user from session & other features (e.g. switch_user)
-        app_user_provider:
-            entity:
-                class: App\Entity\User
-                property: email
+  # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
+  password_hashers:
+    Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: "auto"
 
-    firewalls:
-        dev:
-            # Ensure dev tools and static assets are always allowed
-            pattern: ^/(_profiler|_wdt|assets|build)/
-            security: false
-        main:
-            lazy: true
-            provider: app_user_provider
+  # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
+  providers:
+    app_user_provider:
+      entity:
+        class: App\Entity\User
+        property: email
 
-            # Activate different ways to authenticate:
-            # https://symfony.com/doc/current/security.html#the-firewall
+  firewalls:
+    dev:
+      pattern: ^/(_profiler|_wdt|assets|build)/
+      security: false
 
-            # https://symfony.com/doc/current/security/impersonating_user.html
-            # switch_user: true
+    main:
+      lazy: true
+      stateless: true
+      provider: app_user_provider
+      json_login:
+        check_path: app_api_login
+      custom_authenticator: App\Security\ApiTokenAuthenticator
 
-    # Note: Only the *first* matching rule is applied
-    access_control:
-        # - { path: ^/admin, roles: ROLE_ADMIN }
-        # - { path: ^/profile, roles: ROLE_USER }
+  # Note: Only the *first* matching rule is applied (ORDER MATTERS)
+  access_control:
+    # Swagger / doc : public
+    - { path: ^/api/doc, roles: PUBLIC_ACCESS }
+    - { path: ^/api/doc\.json, roles: PUBLIC_ACCESS }
+    - { path: ^/api/menus$, roles: PUBLIC_ACCESS, methods: [GET] }
+    - { path: ^/api/menus/\d+$, roles: PUBLIC_ACCESS, methods: [GET] }
+
+    # Auth + inscription : public
+    - { path: ^/api/login, roles: PUBLIC_ACCESS }
+    - { path: ^/api/registration, roles: PUBLIC_ACCESS }
+    - { path: ^/api/forgot-password, roles: PUBLIC_ACCESS }
+    - { path: ^/api/reset-password, roles: PUBLIC_ACCESS }
+
+
+    # Admin : gestion des comptes (création employés, désactivation, etc.)
+    - { path: ^/api/users, roles: ROLE_ADMIN }
+
+    # Compte connecté (token)
+    - { path: ^/api/account, roles: IS_AUTHENTICATED_FULLY }
+
+    - { path: ^/api/contact, roles: PUBLIC_ACCESS, methods: [POST] }
+
+    # Avis (Home) : public
+    - { path: ^/api/reviews/validated, roles: PUBLIC_ACCESS, methods: [GET] }
+    - { path: ^/api/reviews, roles: PUBLIC_ACCESS }
+
+    # Avis (modération) : employé/admin
+    - { path: ^/api/reviews/pending, roles: ROLE_EMPLOYE }
+    - { path: ^/api/reviews/\d+/(validate|refuse)$, roles: ROLE_EMPLOYE }
+
+    # Tout le reste de l’API : connecté minimum
+    - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+    
 
 when@test:
     security:
